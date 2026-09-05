@@ -1,0 +1,14 @@
+:root { color-scheme: dark; font: 14px system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #111827; color: #e5e7eb; }
+header { height: 54px; display: flex; align-items: center; gap: 18px; padding: 0 18px; border-bottom: 1px solid #374151; }
+header strong { font-size: 18px; }
+header span { color: #9ca3af; flex: 1; }
+button { border: 1px solid #3b82f6; border-radius: 5px; padding: 7px 11px; background: #2563eb; color: white; cursor: pointer; }
+.workspace { display: grid; grid-template-columns: 58% 42%; height: calc(100vh - 54px); }
+.graph { min-width: 0; background: #0b1220; }
+aside { min-width: 0; padding: 14px; border-left: 1px solid #374151; }
+aside p { color: #9ca3af; }
+.file-header { display: flex; align-items: center; justify-content: space-between; height: 42px; }
+.file-header h2 { font-size: 15px; margin: 0; }
+.loading { padding: 24px; }
