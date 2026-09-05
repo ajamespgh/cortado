@@ -15,3 +15,7 @@ aside p { color: #9ca3af; }
 .loading { padding: 24px; }
 .proposal { position: absolute; z-index: 2; right: 14px; left: 14px; top: 68px; max-height: 70vh; overflow: auto; padding: 14px; background: #111827; border: 1px solid #60a5fa; border-radius: 8px; box-shadow: 0 10px 30px #0008; }
 .proposal pre { max-height: 220px; overflow: auto; background: #030712; padding: 10px; }
+.change-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.change { background: #1f2937; border-color: #4b5563; display: flex; gap: 8px; }
+.change span { color: #9ca3af; }
+.selected-change { border-color: #93c5fd; background: #1d4ed8; }

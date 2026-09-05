@@ -1,5 +1,5 @@
-import { listProjects } from "@/lib/projects";
+import { getProjects } from "@/lib/projects";
 
 export function GET() {
-  return Response.json(listProjects());
+  return Response.json(getProjects());
 }
