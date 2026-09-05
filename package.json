@@ -1,0 +1,11 @@
+{
+  "name": "cortado",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cortado prototype</title>
+  <style>
+    :root { color-scheme: dark; font: 14px system-ui, sans-serif; }
+    body { margin: 0; background: #111827; color: #e5e7eb; }
+    header { padding: 16px 24px; border-bottom: 1px solid #374151; }
+    main { display: grid; grid-template-columns: 1fr 360px; min-height: calc(100vh - 65px); }
+    #graph { position: relative; overflow: auto; padding: 24px; background: #0b1220; }
+    .node { display: inline-block; margin: 8px; padding: 12px; border: 1px solid #60a5fa; border-radius: 8px; background: #172554; cursor: pointer; }
+    .node:hover, .selected { background: #1d4ed8; }
+    #details { padding: 20px; border-left: 1px solid #374151; }
+    pre { white-space: pre-wrap; overflow: auto; max-height: 50vh; background: #030712; padding: 12px; border-radius: 6px; }
+    input, button { font: inherit; padding: 7px 9px; border-radius: 5px; border: 1px solid #4b5563; background: #1f2937; color: inherit; }
+    button { cursor: pointer; background: #2563eb; border-color: #3b82f6; }
+    .muted { color: #9ca3af; }
+    li { margin: 6px 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <header><strong>Cortado</strong> <span class="muted">TypeScript project explorer</span></header>
+  <main>
+    <section id="graph"><p class="muted">Loading project graph…</p></section>
+    <aside id="details"><p class="muted">Select a file to inspect it.</p></aside>
+  </main>
+  <script>
+    const graph = document.querySelector('#graph');
+    const details = document.querySelector('#details');
+    let project;
+    async function load() {
+      const response = await fetch('/analyze');
+      project = await response.json();
+      graph.innerHTML = '<h2>Modules</h2>' + project.nodes.map(node => `<button class="node" data-file="${node.id}">${node.id}</button>`).join('');
+      graph.querySelectorAll('[data-file]').forEach(button => button.onclick = () => inspect(button.dataset.file, button));
+    }
+    async function inspect(file, button) {
+      graph.querySelectorAll('.node').forEach(node => node.classList.remove('selected'));
+      button.classList.add('selected');
+      const source = await (await fetch('/file?path=' + encodeURIComponent(file))).json();
+      const symbols = project.symbols.filter(symbol => symbol.file === file);
+      details.innerHTML = `<h2>${file}</h2><p class="muted">Imports: ${project.edges.filter(edge => edge.from === file).map(edge => edge.to).join(', ') || 'none'}</p><h3>Symbols</h3><ul>${symbols.map(symbol => `<li data-symbol="${symbol.name}"><code>${symbol.name}</code> — line ${symbol.line}, ${symbol.referenceCount} references</li>`).join('') || '<li class="muted">No top-level functions</li>'}</ul><h3>Source</h3><pre>${escapeHtml(source.content)}</pre>`;
+      details.querySelectorAll('[data-symbol]').forEach(item => item.onclick = () => rename(item.dataset.symbol));
+    }
+    async function rename(oldName) {
+      const newName = prompt(`Rename ${oldName} to:`, oldName === 'getProjects' ? 'listProjects' : oldName);
+      if (!newName || newName === oldName) return;
+      const response = await fetch('/rename', { method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({oldName, newName}) });
+      const result = await response.json();
+      if (!response.ok) return alert(result.error);
+      alert(`Changed ${result.referenceCount} references in ${result.changedFiles.length} files.`);
+      await load();
+    }
+    function escapeHtml(value) { return value.replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character])); }
+    load().catch(error => { graph.innerHTML = `<p>${escapeHtml(error.message)}</p>`; });
+  </script>
+</body>
+</html>
