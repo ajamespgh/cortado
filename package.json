@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/server.js",
     "ui": "vite --config ui/vite.config.js",
-    "build:ui": "vite build --config ui/vite.config.js"
+    "build:ui": "vite build --config ui/vite.config.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

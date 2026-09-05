@@ -21,6 +21,7 @@ function App() {
   const [selected, setSelected] = useState(null);
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("Loading analysis…");
+  const [proposal, setProposal] = useState(null);
 
   async function analyze() {
     const data = await request("/analyze");
@@ -44,7 +45,14 @@ function App() {
     let result;
     try { result = await request("/rename", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ oldName: symbol.name, newName }) }); }
     catch (error) { return setStatus(error.message); }
-    setStatus(`Renamed ${result.referenceCount} references in ${result.changedFiles.length} files`);
+    setProposal(result);
+    setStatus(`Rename proposed: ${result.referenceCount} references in ${result.changes.length} files`);
+  }
+
+  async function applyProposal() {
+    const result = await request("/rename/apply", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(proposal) });
+    setProposal(null);
+    setStatus(`Applied ${result.referenceCount} references in ${result.appliedFiles.length} files`);
     await analyze();
     await selectFile(selected);
   }
@@ -58,6 +66,7 @@ function App() {
     <section className="workspace">
       <div className="graph"><ReactFlow nodes={nodes} edges={edges} fitView onNodeClick={(_, node) => selectFile(node.id)}><Background /><Controls /><MiniMap /></ReactFlow></div>
       <aside>
+        {proposal && <div className="proposal"><h2>Review rename</h2>{proposal.changes.map(change => <details open key={change.file}><summary>{change.file} ({change.replacements} replacements)</summary><pre>{change.after}</pre></details>)}<button onClick={applyProposal}>Apply changes</button> <button className="cancel" onClick={() => { setProposal(null); setStatus("Rename cancelled"); }}>Cancel</button></div>}
         {selected ? <><div className="file-header"><h2>{selected}</h2><button onClick={rename}>Rename symbol</button></div><Editor height="calc(100vh - 110px)" language="typescript" theme="vs-dark" value={source} options={{ readOnly: true, minimap: { enabled: false } }} /></> : <p>Select a module to inspect its source.</p>}
       </aside>
     </section>

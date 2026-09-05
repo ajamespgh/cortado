@@ -61,7 +61,7 @@ async function analyze(root) {
   return { root, nodes, edges: edges.filter((edge, index, all) => all.findIndex((item) => item.from === edge.from && item.to === edge.to) === index), symbols: symbols.map(({ references, ...symbol }) => ({ ...symbol, referenceCount: references.length })) };
 }
 
-async function rename(root, oldName, newName) {
+async function planRename(root, oldName, newName) {
   const config = ts.readConfigFile(path.join(root, "tsconfig.json"), ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
   const files = parsed.fileNames;
@@ -80,20 +80,31 @@ async function rename(root, oldName, newName) {
   if (!declaration) throw new Error(`Could not find exported function ${oldName}`);
   const position = declaration.node.name.getStart();
   const locations = service.findRenameLocations(declaration.file, position, false, false, {}) ?? [];
-  const changes = new Map();
+  const locationsByFile = new Map();
   for (const location of locations) {
-    const list = changes.get(location.fileName) ?? [];
+    const list = locationsByFile.get(location.fileName) ?? [];
     list.push(location.textSpan);
-    changes.set(location.fileName, list);
+    locationsByFile.set(location.fileName, list);
   }
-  const diff = [];
-  for (const [file, spans] of changes) {
-    let text = await fs.readFile(file, "utf8");
-    for (const span of spans.sort((a, b) => b.start - a.start)) text = text.slice(0, span.start) + newName + text.slice(span.start + span.length);
-    diff.push({ file: path.relative(root, file), replacements: spans.length });
-    await fs.writeFile(file, text);
+  const changes = [];
+  for (const [file, spans] of locationsByFile) {
+    const before = await fs.readFile(file, "utf8");
+    let after = before;
+    for (const span of spans.sort((a, b) => b.start - a.start)) after = after.slice(0, span.start) + newName + after.slice(span.start + span.length);
+    changes.push({ file: path.relative(root, file), before, after, replacements: spans.length });
   }
-  return { oldName, newName, changedFiles: diff, referenceCount: locations.length };
+  return { oldName, newName, changes, referenceCount: locations.length };
+}
+
+async function applyRename(root, input) {
+  for (const change of input.changes ?? []) {
+    const file = path.resolve(root, change.file);
+    if (!file.startsWith(`${root}${path.sep}`)) throw new Error("Invalid change path");
+    const current = await fs.readFile(file, "utf8");
+    if (current !== change.before) throw new Error(`File changed since preview: ${change.file}`);
+  }
+  for (const change of input.changes) await fs.writeFile(path.resolve(root, change.file), change.after);
+  return { appliedFiles: input.changes.map((change) => change.file), referenceCount: input.referenceCount };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -117,10 +128,17 @@ const server = http.createServer(async (req, res) => {
       let body = "";
       for await (const chunk of req) body += chunk;
       const input = JSON.parse(body);
-      return json(res, 200, await rename(root, input.oldName, input.newName));
+      return json(res, 200, await planRename(root, input.oldName, input.newName));
+    }
+    if (req.method === "POST" && url.pathname === "/rename/apply") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      return json(res, 200, await applyRename(root, JSON.parse(body)));
     }
     return json(res, 404, { error: "Not found" });
   } catch (error) { return json(res, 400, { error: error.message }); }
 });
 
-server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
+export { analyze, planRename, applyRename };
+
+if (process.argv[1] === new URL(import.meta.url).pathname) server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
