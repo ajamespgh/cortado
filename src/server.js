@@ -155,7 +155,7 @@ async function saveFile(root, relative, content, expectedContent) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const root = path.resolve(url.searchParams.get("root") ?? defaultRoot);
+    const root = path.resolve(url.searchParams.get("root") || defaultRoot);
     if (req.method === "OPTIONS") return json(res, 204, {});
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });

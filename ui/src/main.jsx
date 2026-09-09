@@ -25,17 +25,21 @@ function App() {
   const [proposal, setProposal] = useState(null);
   const [proposalFile, setProposalFile] = useState(null);
   const [search, setSearch] = useState("");
+  const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [rootInput, setRootInput] = useState("");
+
+  function withRoot(endpoint) { return `${endpoint}${endpoint.includes("?") ? "&" : "?"}root=${encodeURIComponent(workspaceRoot)}`; }
 
   async function analyze() {
-    const data = await request("/analyze");
+    const data = await request(withRoot("/analyze"));
     setProject(data);
     setStatus(`${data.nodes.length} modules · ${data.edges.length} imports${data.diagnostics.length ? ` · ${data.diagnostics.length} diagnostics` : ""}`);
   }
 
-  useEffect(() => { analyze().catch(error => setStatus(error.message)); }, []);
+  useEffect(() => { analyze().catch(error => setStatus(error.message)); }, [workspaceRoot]);
 
   useEffect(() => {
-    const events = new EventSource("/events");
+    const events = new EventSource(withRoot("/events"));
     events.addEventListener("workspace-change", (event) => {
       const changes = JSON.parse(event.data).changes;
       if (source !== savedSource) setStatus(`External change detected (${changes.map((change) => change.path).join(", ")}); unsaved edits preserved`);
@@ -43,11 +47,11 @@ function App() {
     });
     events.onerror = () => events.close();
     return () => events.close();
-  }, [source, savedSource]);
+  }, [source, savedSource, workspaceRoot]);
 
   async function selectFile(file) {
     setSelected(file);
-    const data = await request(`/file?path=${encodeURIComponent(file)}`);
+    const data = await request(withRoot(`/file?path=${encodeURIComponent(file)}`));
     setSource(data.content);
     setSavedSource(data.content);
   }
@@ -58,7 +62,7 @@ function App() {
     const newName = window.prompt(`Rename ${symbol.name} to:`, symbol.name === "getProjects" ? "listProjects" : symbol.name);
     if (!newName || newName === symbol.name) return;
     let result;
-    try { result = await request("/rename", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ oldName: symbol.name, newName }) }); }
+    try { result = await request(withRoot("/rename"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ oldName: symbol.name, newName }) }); }
     catch (error) { return setStatus(error.message); }
     setProposal(result);
     setProposalFile(result.changes[0] ?? null);
@@ -66,7 +70,7 @@ function App() {
   }
 
   async function applyProposal() {
-    const result = await request("/rename/apply", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(proposal) });
+    const result = await request(withRoot("/rename/apply"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(proposal) });
     setProposal(null);
     setProposalFile(null);
     setStatus(`Applied ${result.referenceCount} references in ${result.appliedFiles.length} files`);
@@ -76,7 +80,7 @@ function App() {
 
   async function saveSource() {
     try {
-      await request("/file", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: selected, content: source, expectedContent: savedSource }) });
+      await request(withRoot("/file"), { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: selected, content: source, expectedContent: savedSource }) });
       setSavedSource(source);
       setStatus(`Saved ${selected}`);
       await analyze();
@@ -91,7 +95,7 @@ function App() {
   const matchingSymbols = project.symbols.filter((symbol) => symbol.name.toLowerCase().includes(query) || symbol.file.toLowerCase().includes(query));
 
   return <main>
-    <header><strong>Cortado</strong><span>{status}</span><button onClick={analyze}>Refresh</button></header>
+    <header><strong>Cortado</strong><input className="root-input" aria-label="Workspace root" placeholder="Workspace path (default fixture)" value={rootInput} onChange={(event) => setRootInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { setWorkspaceRoot(rootInput.trim()); setProject(null); setSelected(null); setProposal(null); } }} /><span>{status}</span><button onClick={analyze}>Refresh</button></header>
     <section className="workspace">
       <div className="graph"><ReactFlow nodes={nodes} edges={edges} fitView onNodeClick={(_, node) => selectFile(node.id)}><Background /><Controls /><MiniMap /></ReactFlow></div>
       <aside>

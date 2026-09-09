@@ -4,6 +4,7 @@ body { margin: 0; background: #111827; color: #e5e7eb; }
 header { height: 54px; display: flex; align-items: center; gap: 18px; padding: 0 18px; border-bottom: 1px solid #374151; }
 header strong { font-size: 18px; }
 header span { color: #9ca3af; flex: 1; }
+.root-input { width: 260px; padding: 7px; border: 1px solid #4b5563; border-radius: 5px; background: #030712; color: #e5e7eb; }
 button { border: 1px solid #3b82f6; border-radius: 5px; padding: 7px 11px; background: #2563eb; color: white; cursor: pointer; }
 .cancel { background: #374151; border-color: #6b7280; }
 .workspace { display: grid; grid-template-columns: 58% 42%; height: calc(100vh - 54px); }
