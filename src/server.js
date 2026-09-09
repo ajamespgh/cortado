@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import ts from "typescript";
+import { createChangeSet, createWorkspace } from "./model.js";
 
 const port = Number(process.env.PORT ?? 4317);
 const defaultRoot = path.resolve("fixtures/reference-next-app");
@@ -58,7 +59,16 @@ async function analyze(root) {
       }
     }
   }
-  return { root, nodes, edges: edges.filter((edge, index, all) => all.findIndex((item) => item.from === edge.from && item.to === edge.to) === index), symbols: symbols.map(({ references, ...symbol }) => ({ ...symbol, referenceCount: references.length })) };
+  const uniqueEdges = edges.filter((edge, index, all) => all.findIndex((item) => item.from === edge.from && item.to === edge.to) === index);
+  const publicSymbols = symbols.map(({ references, line, ...symbol }) => ({ ...symbol, location: { file: symbol.file, start: { line, column: 1 }, end: { line, column: 1 } }, referenceCount: references.length }));
+  const workspace = createWorkspace({
+    root,
+    files: nodes.map(({ id, ...file }) => ({ ...file, id, path: id })),
+    modules: nodes.map(({ id }) => ({ id, path: id, kind: "module" })),
+    symbols: publicSymbols,
+    relationships: uniqueEdges.map((edge) => ({ source: edge.from, target: edge.to, type: edge.kind }))
+  });
+  return { ...workspace, root, nodes, edges: uniqueEdges, symbols: publicSymbols };
 }
 
 async function planRename(root, oldName, newName) {
@@ -93,7 +103,15 @@ async function planRename(root, oldName, newName) {
     for (const span of spans.sort((a, b) => b.start - a.start)) after = after.slice(0, span.start) + newName + after.slice(span.start + span.length);
     changes.push({ file: path.relative(root, file), before, after, replacements: spans.length });
   }
-  return { oldName, newName, changes, referenceCount: locations.length };
+  const changeSet = createChangeSet({
+    id: `rename:${oldName}:${newName}`,
+    sourceVersion: "filesystem-content",
+    changes: changes.map((change) => ({
+      ...change,
+      edits: locationsByFile.get(path.resolve(root, change.file)).map((span) => ({ start: span.start, length: span.length }))
+    }))
+  });
+  return { ...changeSet, oldName, newName, referenceCount: locations.length };
 }
 
 async function applyRename(root, input) {
