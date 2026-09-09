@@ -28,10 +28,21 @@ function App() {
   async function analyze() {
     const data = await request("/analyze");
     setProject(data);
-    setStatus(`${data.nodes.length} modules · ${data.edges.length} imports`);
+    setStatus(`${data.nodes.length} modules · ${data.edges.length} imports${data.diagnostics.length ? ` · ${data.diagnostics.length} diagnostics` : ""}`);
   }
 
   useEffect(() => { analyze().catch(error => setStatus(error.message)); }, []);
+
+  useEffect(() => {
+    const events = new EventSource("/events");
+    events.addEventListener("workspace-change", (event) => {
+      const changes = JSON.parse(event.data).changes;
+      if (source !== savedSource) setStatus(`External change detected (${changes.map((change) => change.path).join(", ")}); unsaved edits preserved`);
+      else analyze().catch(error => setStatus(error.message));
+    });
+    events.onerror = () => events.close();
+    return () => events.close();
+  }, [source, savedSource]);
 
   async function selectFile(file) {
     setSelected(file);
@@ -81,7 +92,7 @@ function App() {
       <div className="graph"><ReactFlow nodes={nodes} edges={edges} fitView onNodeClick={(_, node) => selectFile(node.id)}><Background /><Controls /><MiniMap /></ReactFlow></div>
       <aside>
         {proposal && <div className="proposal"><h2>Review rename</h2><div className="change-list">{proposal.changes.map(change => <button className={proposalFile?.file === change.file ? "change selected-change" : "change"} onClick={() => setProposalFile(change)} key={change.file}>{change.file}<span>{change.replacements} replacements</span></button>)}</div>{proposalFile && <DiffEditor height="360px" language="typescript" theme="vs-dark" original={proposalFile.before} modified={proposalFile.after} options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false } }} />}<button onClick={applyProposal}>Apply changes</button> <button className="cancel" onClick={() => { setProposal(null); setProposalFile(null); setStatus("Rename cancelled"); }}>Cancel</button></div>}
-        {selected ? <><div className="file-header"><h2>{selected}{source !== savedSource && <small> • unsaved</small>}</h2><div><button onClick={saveSource} disabled={source === savedSource}>Save</button> <button onClick={rename}>Rename symbol</button></div></div><Editor height="calc(100vh - 110px)" language="typescript" theme="vs-dark" value={source} onChange={(value) => setSource(value ?? "")} options={{ minimap: { enabled: false } }} /></> : <p>Select a module to inspect its source.</p>}
+        {selected ? <><div className="file-header"><h2>{selected}{source !== savedSource && <small> • unsaved</small>}</h2><div><button onClick={saveSource} disabled={source === savedSource}>Save</button> <button onClick={rename}>Rename symbol</button></div></div>{project.diagnostics.filter((diagnostic) => diagnostic.location?.file === selected).map((diagnostic) => <div className="diagnostic" key={`${diagnostic.code}-${diagnostic.location.start.line}`}>{diagnostic.severity}: {diagnostic.message} ({diagnostic.location.start.line}:{diagnostic.location.start.column})</div>)}<Editor height="calc(100vh - 140px)" language="typescript" theme="vs-dark" value={source} onChange={(value) => setSource(value ?? "")} options={{ minimap: { enabled: false } }} /></> : <p>Select a module to inspect its source.</p>}
       </aside>
     </section>
   </main>;

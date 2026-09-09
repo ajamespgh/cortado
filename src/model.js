@@ -25,7 +25,7 @@ export function createWorkspace({ root, files = [], modules = [], symbols = [], 
     modules,
     symbols: symbols.map((symbol) => ({ ...symbol, location: createLocation(symbol.location.file, symbol.location.start, symbol.location.end) })),
     relationships,
-    diagnostics: diagnostics.map((diagnostic) => ({ ...diagnostic, location: diagnostic.location ? createLocation(diagnostic.location.file, diagnostic.location.start, diagnostic.location.end) : undefined })),
+    diagnostics: diagnostics.map((diagnostic) => ({ ...diagnostic, ...(diagnostic.location?.file ? { location: createLocation(diagnostic.location.file, diagnostic.location.start, diagnostic.location.end) } : {}) })),
   };
 }
 

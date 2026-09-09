@@ -4,10 +4,12 @@ import path from "node:path";
 import process from "node:process";
 import ts from "typescript";
 import { createChangeSet, createWorkspace } from "./model.js";
+import { watchWorkspace } from "./workspace-watch.js";
 
 const port = Number(process.env.PORT ?? 4317);
 const defaultRoot = path.resolve("fixtures/reference-next-app");
 const uiPath = path.resolve("public/index.html");
+const eventClients = new Set();
 
 function json(res, status, body) {
   res.writeHead(status, {
@@ -44,6 +46,20 @@ async function analyze(root) {
   const nodes = files.map((file) => ({ id: path.relative(root, file), kind: "file" }));
   const edges = [];
   const symbols = [];
+  const diagnostics = [...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()].map((diagnostic) => {
+    const file = diagnostic.file;
+    const start = diagnostic.start ?? 0;
+    const length = diagnostic.length ?? 0;
+    const position = file?.getLineAndCharacterOfPosition(start);
+    const relativeFile = file ? path.relative(root, file.fileName) : undefined;
+    const projectFile = relativeFile && !relativeFile.startsWith("..") && !path.isAbsolute(relativeFile);
+    return {
+      severity: diagnostic.category === ts.DiagnosticCategory.Error ? "error" : "warning",
+      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+      code: diagnostic.code,
+      location: projectFile && position ? { file: relativeFile, start: { line: position.line + 1, column: position.character + 1 }, end: { line: position.line + 1, column: position.character + length + 1 } } : undefined
+    };
+  });
 
   for (const sourceFile of program.getSourceFiles()) {
     if (!files.includes(sourceFile.fileName)) continue;
@@ -66,7 +82,8 @@ async function analyze(root) {
     files: nodes.map(({ id, ...file }) => ({ ...file, id, path: id })),
     modules: nodes.map(({ id }) => ({ id, path: id, kind: "module" })),
     symbols: publicSymbols,
-    relationships: uniqueEdges.map((edge) => ({ source: edge.from, target: edge.to, type: edge.kind }))
+    relationships: uniqueEdges.map((edge) => ({ source: edge.from, target: edge.to, type: edge.kind })),
+    diagnostics
   });
   return { ...workspace, root, nodes, edges: uniqueEdges, symbols: publicSymbols };
 }
@@ -145,6 +162,13 @@ const server = http.createServer(async (req, res) => {
       return res.end(await fs.readFile(uiPath, "utf8"));
     }
     if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true });
+    if (req.method === "GET" && url.pathname === "/events") {
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", "connection": "keep-alive", "access-control-allow-origin": "*" });
+      res.write("event: ready\ndata: {}\n\n");
+      eventClients.add(res);
+      req.on("close", () => eventClients.delete(res));
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/analyze") return json(res, 200, await analyze(root));
     if (req.method === "GET" && url.pathname === "/file") {
       const relative = url.searchParams.get("path");
@@ -175,4 +199,11 @@ const server = http.createServer(async (req, res) => {
 
 export { analyze, planRename, applyRename, saveFile };
 
-if (process.argv[1] === new URL(import.meta.url).pathname) server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const stopWatching = watchWorkspace(defaultRoot, (changes) => {
+    const message = `event: workspace-change\ndata: ${JSON.stringify({ changes })}\n\n`;
+    for (const client of eventClients) client.write(message);
+  });
+  server.on("close", stopWatching);
+  server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
+}
