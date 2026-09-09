@@ -10,6 +10,12 @@ button { border: 1px solid #3b82f6; border-radius: 5px; padding: 7px 11px; backg
 .graph { min-width: 0; background: #0b1220; }
 aside { min-width: 0; padding: 14px; border-left: 1px solid #374151; }
 aside p { color: #9ca3af; }
+.navigator { margin-bottom: 10px; }
+.navigator input { width: 100%; padding: 8px; border: 1px solid #4b5563; border-radius: 5px; background: #030712; color: #e5e7eb; }
+.results { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding: 8px; background: #1f2937; border-radius: 5px; }
+.results strong { margin-top: 4px; color: #93c5fd; font-size: 12px; }
+.result { text-align: left; background: #374151; border-color: #4b5563; padding: 5px 7px; }
+.result span { display: block; color: #9ca3af; font-size: 11px; }
 .file-header { display: flex; align-items: center; justify-content: space-between; height: 42px; }
 .file-header h2 { font-size: 15px; margin: 0; }
 .file-header small { color: #fbbf24; font-weight: normal; }
