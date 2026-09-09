@@ -20,6 +20,7 @@ function App() {
   const [project, setProject] = useState(null);
   const [selected, setSelected] = useState(null);
   const [source, setSource] = useState("");
+  const [savedSource, setSavedSource] = useState("");
   const [status, setStatus] = useState("Loading analysis…");
   const [proposal, setProposal] = useState(null);
   const [proposalFile, setProposalFile] = useState(null);
@@ -36,6 +37,7 @@ function App() {
     setSelected(file);
     const data = await request(`/file?path=${encodeURIComponent(file)}`);
     setSource(data.content);
+    setSavedSource(data.content);
   }
 
   async function rename() {
@@ -60,6 +62,15 @@ function App() {
     await selectFile(selected);
   }
 
+  async function saveSource() {
+    try {
+      await request("/file", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: selected, content: source, expectedContent: savedSource }) });
+      setSavedSource(source);
+      setStatus(`Saved ${selected}`);
+      await analyze();
+    } catch (error) { setStatus(error.message); }
+  }
+
   if (!project) return <main className="loading">{status}</main>;
   const nodes = project.nodes.map((node, index) => ({ id: node.id, position: { x: (index % 3) * 260 + 30, y: Math.floor(index / 3) * 130 + 30 }, data: { label: node.id }, style: { background: node.id.includes("api/") ? "#422006" : "#172554", color: "#e5e7eb", border: "1px solid #60a5fa", borderRadius: 8, padding: 12, width: 210 } }));
   const edges = project.edges.map((edge, index) => ({ id: `${edge.from}-${edge.to}-${index}`, source: edge.from, target: edge.to, animated: edge.from === selected, style: { stroke: "#93c5fd" } }));
@@ -70,7 +81,7 @@ function App() {
       <div className="graph"><ReactFlow nodes={nodes} edges={edges} fitView onNodeClick={(_, node) => selectFile(node.id)}><Background /><Controls /><MiniMap /></ReactFlow></div>
       <aside>
         {proposal && <div className="proposal"><h2>Review rename</h2><div className="change-list">{proposal.changes.map(change => <button className={proposalFile?.file === change.file ? "change selected-change" : "change"} onClick={() => setProposalFile(change)} key={change.file}>{change.file}<span>{change.replacements} replacements</span></button>)}</div>{proposalFile && <DiffEditor height="360px" language="typescript" theme="vs-dark" original={proposalFile.before} modified={proposalFile.after} options={{ readOnly: true, renderSideBySide: true, minimap: { enabled: false } }} />}<button onClick={applyProposal}>Apply changes</button> <button className="cancel" onClick={() => { setProposal(null); setProposalFile(null); setStatus("Rename cancelled"); }}>Cancel</button></div>}
-        {selected ? <><div className="file-header"><h2>{selected}</h2><button onClick={rename}>Rename symbol</button></div><Editor height="calc(100vh - 110px)" language="typescript" theme="vs-dark" value={source} options={{ readOnly: true, minimap: { enabled: false } }} /></> : <p>Select a module to inspect its source.</p>}
+        {selected ? <><div className="file-header"><h2>{selected}{source !== savedSource && <small> • unsaved</small>}</h2><div><button onClick={saveSource} disabled={source === savedSource}>Save</button> <button onClick={rename}>Rename symbol</button></div></div><Editor height="calc(100vh - 110px)" language="typescript" theme="vs-dark" value={source} onChange={(value) => setSource(value ?? "")} options={{ minimap: { enabled: false } }} /></> : <p>Select a module to inspect its source.</p>}
       </aside>
     </section>
   </main>;

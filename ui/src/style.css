@@ -12,6 +12,7 @@ aside { min-width: 0; padding: 14px; border-left: 1px solid #374151; }
 aside p { color: #9ca3af; }
 .file-header { display: flex; align-items: center; justify-content: space-between; height: 42px; }
 .file-header h2 { font-size: 15px; margin: 0; }
+.file-header small { color: #fbbf24; font-weight: normal; }
 .loading { padding: 24px; }
 .proposal { position: absolute; z-index: 2; right: 14px; left: 14px; top: 68px; max-height: 70vh; overflow: auto; padding: 14px; background: #111827; border: 1px solid #60a5fa; border-radius: 8px; box-shadow: 0 10px 30px #0008; }
 .proposal pre { max-height: 220px; overflow: auto; background: #030712; padding: 10px; }

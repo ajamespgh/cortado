@@ -125,6 +125,16 @@ async function applyRename(root, input) {
   return { appliedFiles: input.changes.map((change) => change.file), referenceCount: input.referenceCount };
 }
 
+async function saveFile(root, relative, content, expectedContent) {
+  if (!relative || relative.includes("..") || path.isAbsolute(relative)) throw new Error("Invalid project-relative path");
+  if (typeof content !== "string") throw new Error("File content must be text");
+  const file = path.join(root, relative);
+  const current = await fs.readFile(file, "utf8");
+  if (expectedContent !== undefined && current !== expectedContent) throw new Error(`File changed since it was opened: ${relative}`);
+  await fs.writeFile(file, content, "utf8");
+  return { path: relative, content };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -142,6 +152,12 @@ const server = http.createServer(async (req, res) => {
       const file = path.join(root, relative);
       return json(res, 200, { path: relative, content: await fs.readFile(file, "utf8") });
     }
+    if (req.method === "PUT" && url.pathname === "/file") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const input = JSON.parse(body);
+      return json(res, 200, await saveFile(root, input.path, input.content, input.expectedContent));
+    }
     if (req.method === "POST" && url.pathname === "/rename") {
       let body = "";
       for await (const chunk of req) body += chunk;
@@ -157,6 +173,6 @@ const server = http.createServer(async (req, res) => {
   } catch (error) { return json(res, 400, { error: error.message }); }
 });
 
-export { analyze, planRename, applyRename };
+export { analyze, planRename, applyRename, saveFile };
 
 if (process.argv[1] === new URL(import.meta.url).pathname) server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
