@@ -56,6 +56,14 @@ npm run ui
 
 Open <http://localhost:5173>.
 
+For the usual development workflow, start both processes and open the UI with one command:
+
+```bash
+npm run dev
+```
+
+Use `npm run dev -- --no-open` when you do not want the browser to open automatically. Press Ctrl+C to stop both processes. The separate `npm start` and `npm run ui` commands remain available when debugging one side independently.
+
 The service listens on `127.0.0.1:4317` and provides `/health`, `/analyze`, `/file`, `/rename`, and `/rename/apply`.
 
 ## Verification

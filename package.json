@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "node scripts/dev.js",
     "start": "node src/server.js",
     "ui": "vite --config ui/vite.config.js",
     "build:ui": "vite build --config ui/vite.config.js",
