@@ -55,14 +55,60 @@ async function openWorkspace(root) {
 }
 
 async function analyze(root) {
-  const configPath = path.join(root, "tsconfig.json");
+  const configPaths = await discoverProjectConfigs(root);
+  if (!configPaths.length) throw new Error("No tsconfig.json found in workspace");
+  const analyses = configPaths.map((configPath) => analyzeProject(root, configPath));
+  const completed = analyses.filter((analysis) => analysis.status === "ready");
+  const files = [...new Set(completed.flatMap((analysis) => analysis.files))].sort();
+  const nodes = files.map((file) => ({ id: file, kind: "file" }));
+  const edges = uniqueBy(completed.flatMap((analysis) => analysis.edges), (edge) => `${edge.from}:${edge.to}:${edge.kind}`);
+  const symbols = completed.flatMap((analysis) => analysis.symbols);
+  const diagnostics = analyses.flatMap((analysis) => analysis.diagnostics);
+  const workspace = createWorkspace({
+    root,
+    files: nodes.map(({ id, ...file }) => ({ ...file, id, path: id })),
+    modules: nodes.map(({ id }) => ({ id, path: id, kind: "module" })),
+    symbols,
+    relationships: edges.map((edge) => ({ source: edge.from, target: edge.to, type: edge.kind })),
+    diagnostics,
+    projects: analyses.map(({ configPath, files: projectFiles, status, diagnostics: projectDiagnostics }) => ({
+      id: configPath,
+      configPath,
+      files: projectFiles,
+      status,
+      diagnostics: projectDiagnostics,
+    })),
+  });
+  return { ...workspace, root, nodes, edges, symbols };
+}
+
+async function discoverProjectConfigs(root) {
+  const configs = [];
+  async function visit(directory) {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!ignoredDirectories.has(entry.name)) await visit(path.join(directory, entry.name));
+      } else if (entry.name === "tsconfig.json") {
+        configs.push(path.relative(root, path.join(directory, entry.name)).replaceAll(path.sep, "/"));
+      }
+    }
+  }
+  await visit(root);
+  return configs.sort();
+}
+
+function analyzeProject(root, relativeConfigPath) {
+  const configPath = path.join(root, relativeConfigPath);
   const config = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, "\n"));
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+  if (config.error) {
+    const diagnostic = { severity: "error", message: ts.flattenDiagnosticMessageText(config.error.messageText, "\n"), code: config.error.code, project: relativeConfigPath };
+    return { configPath: relativeConfigPath, files: [], edges: [], symbols: [], diagnostics: [diagnostic], status: "error" };
+  }
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
   const program = ts.createProgram(parsed.fileNames, parsed.options);
   const checker = program.getTypeChecker();
-  const files = parsed.fileNames.filter((file) => /\.(tsx?|jsx?)$/.test(file));
-  const nodes = files.map((file) => ({ id: path.relative(root, file), kind: "file" }));
+  const absoluteFiles = parsed.fileNames.filter((file) => /\.(tsx?|jsx?)$/.test(file));
+  const files = absoluteFiles.map((file) => path.relative(root, file).replaceAll(path.sep, "/"));
   const edges = [];
   const symbols = [];
   const diagnostics = [...program.getSyntacticDiagnostics(), ...program.getSemanticDiagnostics()].map((diagnostic) => {
@@ -76,17 +122,18 @@ async function analyze(root) {
       severity: diagnostic.category === ts.DiagnosticCategory.Error ? "error" : "warning",
       message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
       code: diagnostic.code,
+      project: relativeConfigPath,
       location: projectFile && position ? { file: relativeFile, start: { line: position.line + 1, column: position.character + 1 }, end: { line: position.line + 1, column: position.character + length + 1 } } : undefined
     };
   });
 
   for (const sourceFile of program.getSourceFiles()) {
-    if (!files.includes(sourceFile.fileName)) continue;
-    const from = path.relative(root, sourceFile.fileName);
+    if (!absoluteFiles.includes(sourceFile.fileName)) continue;
+    const from = path.relative(root, sourceFile.fileName).replaceAll(path.sep, "/");
     for (const statement of sourceFile.statements) {
       if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
         const target = ts.resolveModuleName(statement.moduleSpecifier.text, sourceFile.fileName, parsed.options, ts.sys).resolvedModule?.resolvedFileName;
-        if (target && files.includes(target)) edges.push({ from, to: path.relative(root, target), kind: "import" });
+        if (target && absoluteFiles.includes(target)) edges.push({ from, to: path.relative(root, target).replaceAll(path.sep, "/"), kind: "import" });
       }
       if (ts.isFunctionDeclaration(statement) && statement.name) {
         const symbol = checker.getSymbolAtLocation(statement.name);
@@ -94,22 +141,19 @@ async function analyze(root) {
       }
     }
   }
-  const uniqueEdges = edges.filter((edge, index, all) => all.findIndex((item) => item.from === edge.from && item.to === edge.to) === index);
-  const publicSymbols = symbols.map(({ references, line, ...symbol }) => ({ ...symbol, location: { file: symbol.file, start: { line, column: 1 }, end: { line, column: 1 } }, referenceCount: references.length }));
-  const workspace = createWorkspace({
-    root,
-    files: nodes.map(({ id, ...file }) => ({ ...file, id, path: id })),
-    modules: nodes.map(({ id }) => ({ id, path: id, kind: "module" })),
-    symbols: publicSymbols,
-    relationships: uniqueEdges.map((edge) => ({ source: edge.from, target: edge.to, type: edge.kind })),
-    diagnostics
-  });
-  return { ...workspace, root, nodes, edges: uniqueEdges, symbols: publicSymbols };
+  const publicSymbols = symbols.map(({ references, line, ...symbol }) => ({ ...symbol, project: relativeConfigPath, location: { file: symbol.file, start: { line, column: 1 }, end: { line, column: 1 } }, referenceCount: references.length }));
+  return { configPath: relativeConfigPath, files, edges: uniqueBy(edges, (edge) => `${edge.from}:${edge.to}:${edge.kind}`), symbols: publicSymbols, diagnostics, status: "ready" };
 }
 
-async function planRename(root, oldName, newName) {
-  const config = ts.readConfigFile(path.join(root, "tsconfig.json"), ts.sys.readFile);
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+function uniqueBy(items, key) {
+  return items.filter((item, index) => items.findIndex((candidate) => key(candidate) === key(item)) === index);
+}
+
+function createRenameService(root, relativeConfigPath) {
+  const configPath = path.join(root, relativeConfigPath);
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, "\n"));
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
   const files = parsed.fileNames;
   const versions = new Map(files.map((file) => [file, "0"]));
   const host = {
@@ -122,8 +166,22 @@ async function planRename(root, oldName, newName) {
     fileExists: ts.sys.fileExists, readFile: ts.sys.readFile, readDirectory: ts.sys.readDirectory
   };
   const service = ts.createLanguageService(host);
-  const declaration = files.map((file) => ({ file, source: service.getProgram()?.getSourceFile(file) })).flatMap(({ file, source }) => source ? [ts.forEachChild(source, (node) => ts.isFunctionDeclaration(node) && node.name?.text === oldName ? { file, node } : undefined)] : []).find(Boolean);
+  return { files, service };
+}
+
+async function planRename(root, oldName, newName, sourceFile) {
+  const requestedFile = sourceFile && path.resolve(root, sourceFile);
+  if (sourceFile && (!requestedFile.startsWith(`${root}${path.sep}`) || path.isAbsolute(sourceFile))) throw new Error("Invalid source file");
+  const candidateConfigs = await discoverProjectConfigs(root);
+  const candidates = candidateConfigs.map((configPath) => ({ configPath, ...createRenameService(root, configPath) }))
+    .filter((candidate) => !requestedFile || candidate.files.includes(requestedFile));
+  const declarations = candidates.flatMap((candidate) => candidate.files.map((file) => ({ file, source: candidate.service.getProgram()?.getSourceFile(file), candidate }))
+    .flatMap(({ file, source, candidate }) => source ? [ts.forEachChild(source, (node) => ts.isFunctionDeclaration(node) && node.name?.text === oldName ? { file, node, candidate } : undefined)] : [])
+    .filter(Boolean));
+  if (!sourceFile && declarations.length > 1) throw new Error(`Rename ${oldName} is ambiguous across projects; select its source file`);
+  const declaration = declarations[0];
   if (!declaration) throw new Error(`Could not find exported function ${oldName}`);
+  const { service, files } = declaration.candidate;
   const position = declaration.node.name.getStart();
   const locations = service.findRenameLocations(declaration.file, position, false, false, {}) ?? [];
   const locationsByFile = new Map();
@@ -147,7 +205,7 @@ async function planRename(root, oldName, newName) {
       edits: locationsByFile.get(path.resolve(root, change.file)).map((span) => ({ start: span.start, length: span.length }))
     }))
   });
-  return { ...changeSet, oldName, newName, referenceCount: locations.length };
+  return { ...changeSet, oldName, newName, sourceFile, project: declaration.candidate.configPath, referenceCount: locations.length };
 }
 
 async function applyRename(root, input) {
@@ -213,7 +271,7 @@ const server = http.createServer(async (req, res) => {
       let body = "";
       for await (const chunk of req) body += chunk;
       const input = JSON.parse(body);
-      return json(res, 200, await planRename(root, input.oldName, input.newName));
+      return json(res, 200, await planRename(root, input.oldName, input.newName, input.sourceFile));
     }
     if (req.method === "POST" && url.pathname === "/rename/apply") {
       let body = "";

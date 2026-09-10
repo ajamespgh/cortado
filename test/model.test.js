@@ -7,11 +7,13 @@ test("project resources are UI-independent and project-relative", () => {
     root: "/tmp/project",
     files: [{ path: "src/index.ts", kind: "file" }],
     symbols: [{ id: "symbol:main", name: "main", location: createLocation("src/index.ts", { line: 1, column: 17 }) }],
+    projects: [{ id: "tsconfig.json", configPath: "tsconfig.json", files: ["src/index.ts"], status: "ready" }],
   });
   assert.equal(workspace.kind, "workspace");
   assert.equal(workspace.files[0].path, "src/index.ts");
   assert.equal(resourceUri("src/index.ts"), "cortado:/src/index.ts");
   assert.equal(workspace.symbols[0].location.file, "src/index.ts");
+  assert.equal(workspace.projects[0].files[0], "src/index.ts");
 });
 
 test("workspace rejects paths that escape the project", () => {

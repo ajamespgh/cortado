@@ -26,3 +26,4 @@ GitHub issues manage changes and discussion. These documents and the tests are t
 | ID | Requirement | Status |
 | --- | --- | --- |
 | [BR-001](./BR-001-safe-symbol-rename.md) | Safe symbol rename is reviewable and explicit | Proposed |
+| [BR-002](./BR-002-multi-project-workspace-analysis.md) | Multi-project workspace analysis is explicit | Accepted |

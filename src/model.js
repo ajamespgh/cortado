@@ -17,7 +17,7 @@ export function createLocation(file, start, end = start) {
   return { file: assertProjectRelative(file, "location file"), start, end };
 }
 
-export function createWorkspace({ root, files = [], modules = [], symbols = [], relationships = [], diagnostics = [] }) {
+export function createWorkspace({ root, files = [], modules = [], symbols = [], relationships = [], diagnostics = [], projects = [] }) {
   return {
     kind: "workspace",
     root,
@@ -26,6 +26,11 @@ export function createWorkspace({ root, files = [], modules = [], symbols = [], 
     symbols: symbols.map((symbol) => ({ ...symbol, location: createLocation(symbol.location.file, symbol.location.start, symbol.location.end) })),
     relationships,
     diagnostics: diagnostics.map((diagnostic) => ({ ...diagnostic, ...(diagnostic.location?.file ? { location: createLocation(diagnostic.location.file, diagnostic.location.start, diagnostic.location.end) } : {}) })),
+    projects: projects.map((project) => ({
+      ...project,
+      configPath: assertProjectRelative(project.configPath, "project config path"),
+      files: (project.files ?? []).map((file) => assertProjectRelative(file, "project file")),
+    })),
   };
 }
 

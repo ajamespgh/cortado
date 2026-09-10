@@ -2,17 +2,17 @@
 
 ## Status
 
-Proposed; first-version contract for issue #9.
+Accepted; first-version contract for issue #9.
 
 ## Decision
 
-Cortado will represent workspace resources and analysis results as plain, UI-independent data. The initial model includes project-relative files, modules, symbols, source locations, typed relationships, diagnostics, and explicit change sets. Resource URIs use the `cortado:/` scheme and change-set edits are anchored to project-relative files and a source version.
+Cortado will represent workspace resources and analysis results as plain, UI-independent data. The initial model includes project-relative files, analysis projects, modules, symbols, source locations, typed relationships, diagnostics, and explicit change sets. Resource URIs use the `cortado:/` scheme and change-set edits are anchored to project-relative files and a source version.
 
 The model is implemented in `src/model.js`. It does not depend on React Flow, Monaco, Git, Electron, WSL, or a particular transport protocol.
 
 ## Scope
 
-The first version validates resource paths, normalizes separators, preserves source locations and diagnostics, and represents reviewable file changes. It does not yet define persistence, workspace discovery, incremental invalidation, Git state, or a complete symbol/relationship schema.
+The first version validates resource paths, normalizes separators, preserves source locations and diagnostics, and represents reviewable file changes. A workspace may contain multiple independently analyzed TypeScript projects, each identified by its project-relative configuration path and analysis status. It does not yet define persistence, TypeScript project-reference build ordering, incremental invalidation, Git state, or a complete symbol/relationship schema.
 
 ## Rationale
 

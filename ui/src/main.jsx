@@ -138,7 +138,7 @@ function App() {
       setWorkspace(contents); setProject(null); setSelected(null); setSource(""); setSavedSource("");
       try {
         const analysis = await request(`/analyze${query(root)}`);
-        setProject(analysis); setStatus(`${analysis.nodes.length} modules · ${analysis.edges.length} imports${analysis.diagnostics.length ? ` · ${analysis.diagnostics.length} diagnostics` : ""}`);
+        setProject(analysis); setStatus(`${analysis.projects?.length ?? 1} TypeScript project${analysis.projects?.length === 1 ? "" : "s"} · ${analysis.nodes.length} modules · ${analysis.edges.length} imports${analysis.diagnostics.length ? ` · ${analysis.diagnostics.length} diagnostics` : ""}`);
       } catch (error) { setStatus(`Workspace open; analysis unavailable: ${error.message}`); }
     } catch (error) { setWorkspace(null); setProject(null); setStatus(`No workspace open: ${error.message}`); }
   }
@@ -162,7 +162,7 @@ function App() {
     if (!symbol) return setStatus("Select a file containing a supported function symbol");
     const newName = window.prompt(`Rename ${symbol.name} to:`, symbol.name);
     if (!newName || newName === symbol.name) return;
-    try { setProposal(await request(`/rename${query(workspace.root)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ oldName: symbol.name, newName }) })); }
+    try { setProposal(await request(`/rename${query(workspace.root)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ oldName: symbol.name, newName, sourceFile: selected }) })); }
     catch (error) { setStatus(error.message); }
   }
 
