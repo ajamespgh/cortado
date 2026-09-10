@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ReactFlow, Background, Controls, Handle, Position, applyNodeChanges } from "@xyflow/react";
 import Editor, { DiffEditor } from "@monaco-editor/react";
@@ -118,15 +118,27 @@ function Explorer({ workspace, projects, activeProject, onProjectChange, selecte
   return <aside className="explorer"><div className="explorer-title"><strong>Explorer</strong><button className="icon-button" onClick={onToggle}>…</button></div><ProjectCoverage projects={projects} activeProject={activeProject} onProjectChange={onProjectChange} /><section className="open-editors"><div className="section-title">⌄ Open Editors</div>{selected && <button className="tree-row editor-row" onClick={() => onSelect(selected)}>◇ {fileName(selected)}</button>}</section><section className="tree"><button className="tree-row root-row" onClick={() => toggle(".")}><span>{expanded.has(".") ? "⌄" : "›"}</span>{root.name}</button>{expanded.has(".") && <>{children.folders.map((folder) => renderFolder(folder, 0))}{children.files.map((file) => renderFile(file, 0))}</>}</section></aside>;
 }
 
-function EditorArea({ selected, activeFile, source, savedSource, project, onChange, onSave, onRename }) {
+function EditorArea({ selected, location, activeFile, source, savedSource, project, onChange, onSave, onRename, onSelectLocation }) {
+  const editorRef = useRef(null);
   const diagnostics = project?.diagnostics.filter((item) => item.location?.file === selected) || [];
-  return <div className="editor-area"><div className="file-header"><h2>{selected}{source !== savedSource && <small> • unsaved</small>}</h2><div><button onClick={onSave} disabled={source === savedSource || !activeFile?.editable}>Save</button><button onClick={onRename} disabled={!project}>Rename symbol</button></div></div>{diagnostics.map((item) => <div className="diagnostic" key={`${item.code}-${item.location.start.line}`}>{item.severity}: {item.message}</div>)}<Editor height="calc(100vh - 140px)" language={language(selected)} theme="vs-dark" value={source} onChange={(value) => onChange(value ?? "")} options={{ minimap: { enabled: false }, readOnly: !activeFile?.editable }} /></div>;
+  const symbols = project?.symbols.filter((item) => item.file === selected) || [];
+  const outgoing = project?.edges.filter((item) => item.from === selected) || [];
+  const incoming = project?.edges.filter((item) => item.to === selected) || [];
+  useEffect(() => {
+    if (!location || !editorRef.current) return;
+    const range = { startLineNumber: location.start.line, startColumn: location.start.column, endLineNumber: location.end.line, endColumn: location.end.column };
+    editorRef.current.revealRangeInCenter(range);
+    editorRef.current.setSelection(range);
+    editorRef.current.focus();
+  }, [location, selected]);
+  return <div className="editor-area"><div className="file-header"><h2>{selected}{source !== savedSource && <small> • unsaved</small>}</h2><div><button onClick={onSave} disabled={source === savedSource || !activeFile?.editable}>Save</button><button onClick={onRename} disabled={!project}>Rename symbol</button></div></div><div className="source-context"><div><strong>Symbols</strong>{symbols.length ? symbols.map((symbol) => <button key={`${symbol.name}:${symbol.location.start.line}`} onClick={() => onSelectLocation(symbol.location)}>{symbol.name} <small>{symbol.referenceCount} refs</small></button>) : <span>None detected</span>}</div><div><strong>Imports</strong>{outgoing.length ? outgoing.map((edge) => <button key={edge.to} onClick={() => onSelectLocation({ file: edge.to })}>{edge.to}</button>) : <span>None</span>}</div><div><strong>Imported by</strong>{incoming.length ? incoming.map((edge) => <button key={edge.from} onClick={() => onSelectLocation({ file: edge.from })}>{edge.from}</button>) : <span>None</span>}</div></div>{diagnostics.map((item) => <div className="diagnostic" key={`${item.code}-${item.location.start.line}`}>{item.severity}: {item.message}</div>)}<Editor height="calc(100vh - 210px)" language={language(selected)} theme="vs-dark" value={source} onMount={(editor) => { editorRef.current = editor; }} onChange={(value) => onChange(value ?? "")} options={{ minimap: { enabled: false }, readOnly: !activeFile?.editable }} /></div>;
 }
 
 function App() {
   const [workspace, setWorkspace] = useState(null);
   const [project, setProject] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   const [source, setSource] = useState("");
   const [savedSource, setSavedSource] = useState("");
   const [rootInput, setRootInput] = useState("");
@@ -142,7 +154,7 @@ function App() {
     setStatus("Opening workspace…");
     try {
       const contents = await request(`/workspace${query(root)}`);
-      setWorkspace(contents); setProject(null); setSelected(null); setSource(""); setSavedSource(""); setActiveProject("all");
+      setWorkspace(contents); setProject(null); setSelected(null); setSelectedLocation(null); setSource(""); setSavedSource(""); setActiveProject("all");
       try {
         const analysis = await request(`/analyze${query(root)}`);
         setProject(analysis); setStatus(`${analysis.projects?.length ?? 1} TypeScript project${analysis.projects?.length === 1 ? "" : "s"} · ${analysis.nodes.length} modules · ${analysis.edges.length} imports${analysis.diagnostics.length ? ` · ${analysis.diagnostics.length} diagnostics` : ""}`);
@@ -150,8 +162,10 @@ function App() {
     } catch (error) { setWorkspace(null); setProject(null); setStatus(`No workspace open: ${error.message}`); }
   }
 
-  async function selectFile(file) {
+  async function selectFile(file, location, revealEditor = false) {
     setSelected(file);
+    setSelectedLocation(location?.start ? location : null);
+    if (revealEditor) setView("explorer");
     try { const result = await request(`/file${query(workspace.root, `&path=${encodeURIComponent(file)}`)}`); setSource(result.content); setSavedSource(result.content); }
     catch (error) { setStatus(error.message); }
   }
@@ -200,9 +214,12 @@ function App() {
 
   const activeFile = workspace?.files.find((file) => file.path === selected);
   const filteredFiles = useMemo(() => workspace?.files.filter((file) => file.path.toLowerCase().includes(rootInput.toLowerCase())) || [], [workspace, rootInput]);
-  const renderedEdges = useMemo(() => edges.map((edge) => ({ ...edge, style: { stroke: edge.relationType === "containment" ? "#fbbf24" : "#93c5fd", strokeDasharray: edge.relationType === "containment" ? "5 4" : undefined } })), [edges]);
+  const renderedEdges = useMemo(() => edges.map((edge) => {
+    const related = edge.relationType === "import" && (edge.source === `workspace:${selected}` || edge.target === `workspace:${selected}`);
+    return { ...edge, animated: related, style: { stroke: related ? "#fbbf24" : edge.relationType === "containment" ? "#fbbf24" : "#93c5fd", strokeWidth: related ? 3 : 1, opacity: selected && edge.relationType === "import" && !related ? .22 : 1, strokeDasharray: edge.relationType === "containment" ? "5 4" : undefined } };
+  }), [edges, selected]);
   if (!workspace) return <main className="empty-state"><div><h1>Cortado</h1><p>{status}</p><input className="root-input empty-input" placeholder="Enter a workspace path" value={rootInput} onChange={(event) => setRootInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && rootInput.trim() && openWorkspace(rootInput.trim())} /><p className="hint">Open any accessible folder to browse it. TypeScript analysis activates when available.</p></div></main>;
-  return <main><header><strong>Cortado</strong><span className="workspace-label">{workspace.root}</span><span className="status">{status}</span><button onClick={() => { setView("explorer"); setCollapsed(false); }}>Projects</button><button onClick={() => openWorkspace(workspace.root)}>Refresh</button></header><section className="shell"><nav className="activity-bar"><button className={view === "explorer" ? "activity active" : "activity"} onClick={() => { setView("explorer"); setCollapsed(false); }} aria-label="Explorer">▣</button><button className={view === "graph" ? "activity active" : "activity"} onClick={() => setView("graph")} aria-label="Graph">⌘</button><button className="activity" onClick={() => setCollapsed((value) => !value)} aria-label="Toggle explorer">◧</button></nav>{view === "explorer" && <Explorer workspace={workspace} projects={project?.projects} activeProject={activeProject} onProjectChange={setActiveProject} selected={selected} onSelect={selectFile} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />}<section className="content"><div className="workspace-path"><input aria-label="Workspace path" placeholder="Workspace path" value={rootInput} onChange={(event) => setRootInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && rootInput.trim() && openWorkspace(rootInput.trim())} /><button onClick={() => rootInput.trim() && openWorkspace(rootInput.trim())}>Open</button></div>{view === "graph" ? <><div className="graph-focus"><ProjectCoverage projects={project?.projects} activeProject={activeProject} onProjectChange={setActiveProject} /></div><div className="graph"><ReactFlow nodeTypes={nodeTypes} nodes={nodes} edges={renderedEdges} fitView onNodesChange={(changes) => setNodes((current) => applyNodeChanges(changes, current))} onNodeClick={(_, node) => node.id !== "workspace:." && selectFile(node.id.replace("workspace:", ""))}><Background /><Controls /></ReactFlow></div></> : selected ? <EditorArea selected={selected} activeFile={activeFile} source={source} savedSource={savedSource} project={project} onChange={setSource} onSave={saveFile} onRename={renameFileSymbol} /> : <div className="no-selection"><p>Select a file from the Explorer.</p><p>{filteredFiles.length} files available in this workspace.</p></div>}{proposal && <div className="proposal"><h2>Review rename</h2>{proposal.changes.map((change) => <div key={change.file}><strong>{change.file}</strong><DiffEditor height="180px" language="typescript" theme="vs-dark" original={change.before} modified={change.after} options={{ readOnly: true, minimap: { enabled: false } }} /></div>)}<button onClick={applyRename}>Apply changes</button><button className="cancel" onClick={() => setProposal(null)}>Cancel</button></div>}</section></section></main>;
+  return <main><header><strong>Cortado</strong><span className="workspace-label">{workspace.root}</span><span className="status">{status}</span><button onClick={() => { setView("explorer"); setCollapsed(false); }}>Projects</button><button onClick={() => openWorkspace(workspace.root)}>Refresh</button></header><section className="shell"><nav className="activity-bar"><button className={view === "explorer" ? "activity active" : "activity"} onClick={() => { setView("explorer"); setCollapsed(false); }} aria-label="Explorer">▣</button><button className={view === "graph" ? "activity active" : "activity"} onClick={() => setView("graph")} aria-label="Graph">⌘</button><button className="activity" onClick={() => setCollapsed((value) => !value)} aria-label="Toggle explorer">◧</button></nav>{view === "explorer" && <Explorer workspace={workspace} projects={project?.projects} activeProject={activeProject} onProjectChange={setActiveProject} selected={selected} onSelect={selectFile} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />}<section className="content"><div className="workspace-path"><input aria-label="Workspace path" placeholder="Workspace path" value={rootInput} onChange={(event) => setRootInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && rootInput.trim() && openWorkspace(rootInput.trim())} /><button onClick={() => rootInput.trim() && openWorkspace(rootInput.trim())}>Open</button></div>{view === "graph" ? <><div className="graph-focus"><ProjectCoverage projects={project?.projects} activeProject={activeProject} onProjectChange={setActiveProject} /></div><div className="graph"><ReactFlow nodeTypes={nodeTypes} nodes={nodes} edges={renderedEdges} fitView onNodesChange={(changes) => setNodes((current) => applyNodeChanges(changes, current))} onNodeClick={(_, node) => node.id !== "workspace:." && selectFile(node.id.replace("workspace:", ""), undefined, true)}><Background /><Controls /></ReactFlow></div></> : selected ? <EditorArea selected={selected} location={selectedLocation} activeFile={activeFile} source={source} savedSource={savedSource} project={project} onChange={setSource} onSave={saveFile} onRename={renameFileSymbol} onSelectLocation={(location) => selectFile(location.file || selected, location)} /> : <div className="no-selection"><p>Select a file from the Explorer.</p><p>{filteredFiles.length} files available in this workspace.</p></div>}{proposal && <div className="proposal"><h2>Review rename</h2>{proposal.changes.map((change) => <div key={change.file}><strong>{change.file}</strong><DiffEditor height="180px" language="typescript" theme="vs-dark" original={change.before} modified={change.after} options={{ readOnly: true, minimap: { enabled: false } }} /></div>)}<button onClick={applyRename}>Apply changes</button><button className="cancel" onClick={() => setProposal(null)}>Cancel</button></div>}</section></section></main>;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

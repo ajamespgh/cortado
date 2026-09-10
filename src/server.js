@@ -137,11 +137,13 @@ function analyzeProject(root, relativeConfigPath) {
       }
       if (ts.isFunctionDeclaration(statement) && statement.name) {
         const symbol = checker.getSymbolAtLocation(statement.name);
-        symbols.push({ name: statement.name.text, file: from, line: sourceFile.getLineAndCharacterOfPosition(statement.name.getStart()).line + 1, exported: Boolean(statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)), references: symbol ? checker.getReferencesAtLocation?.(statement.name) ?? [] : [] });
+        const start = sourceFile.getLineAndCharacterOfPosition(statement.name.getStart());
+        const end = sourceFile.getLineAndCharacterOfPosition(statement.name.getEnd());
+        symbols.push({ name: statement.name.text, file: from, start: { line: start.line + 1, column: start.character + 1 }, end: { line: end.line + 1, column: end.character + 1 }, exported: Boolean(statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)), references: symbol ? checker.getReferencesAtLocation?.(statement.name) ?? [] : [] });
       }
     }
   }
-  const publicSymbols = symbols.map(({ references, line, ...symbol }) => ({ ...symbol, project: relativeConfigPath, location: { file: symbol.file, start: { line, column: 1 }, end: { line, column: 1 } }, referenceCount: references.length }));
+  const publicSymbols = symbols.map(({ references, start, end, ...symbol }) => ({ ...symbol, project: relativeConfigPath, location: { file: symbol.file, start, end }, referenceCount: references.length }));
   return { configPath: relativeConfigPath, files, edges: uniqueBy(edges, (edge) => `${edge.from}:${edge.to}:${edge.kind}`), symbols: publicSymbols, diagnostics, status: "ready" };
 }
 

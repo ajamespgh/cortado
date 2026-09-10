@@ -47,6 +47,13 @@ header strong { font-size: 18px; }
 .file-header { display: flex; align-items: center; justify-content: space-between; height: 42px; padding: 0 12px; }
 .file-header h2 { font-size: 15px; margin: 0; }
 .file-header small { color: #fbbf24; font-weight: normal; }
+.source-context { display: flex; gap: 1px; overflow: auto; border-top: 1px solid #30343b; border-bottom: 1px solid #30343b; background: #111827; }
+.source-context > div { display: flex; min-width: 170px; flex: 1; flex-direction: column; gap: 3px; padding: 6px 10px; border-right: 1px solid #30343b; font-size: 12px; }
+.source-context strong { color: #9ca3af; font-size: 11px; text-transform: uppercase; }
+.source-context span { color: #6b7280; }
+.source-context button { overflow: hidden; border: 0; padding: 1px 0; border-radius: 0; background: transparent; color: #93c5fd; text-align: left; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.source-context button:hover { color: #fbbf24; text-decoration: underline; }
+.source-context button small { color: #9ca3af; }
 .diagnostic { margin: 4px 12px; padding: 6px 8px; border-left: 3px solid #f87171; background: #3f1d2e; color: #fecaca; font-size: 12px; }
 .no-selection, .empty-state { display: grid; place-items: center; flex: 1; color: #9ca3af; }
 .empty-state { min-height: 100vh; text-align: center; }

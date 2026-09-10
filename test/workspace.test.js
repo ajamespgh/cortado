@@ -14,6 +14,8 @@ test("issue #10: a selected workspace can be analyzed independently of the fixtu
     assert.equal(workspace.root, root);
     assert.deepEqual(workspace.files.map((file) => file.path), ["main.ts"]);
     assert.equal(workspace.symbols[0].name, "customWorkspace");
+    assert.deepEqual(workspace.symbols[0].location.start, { line: 1, column: 17 });
+    assert.deepEqual(workspace.symbols[0].location.end, { line: 1, column: 32 });
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
 
