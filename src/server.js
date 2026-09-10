@@ -4,12 +4,11 @@ import path from "node:path";
 import process from "node:process";
 import ts from "typescript";
 import { createChangeSet, createWorkspace } from "./model.js";
-import { watchWorkspace } from "./workspace-watch.js";
 
 const port = Number(process.env.PORT ?? 4317);
-const defaultRoot = path.resolve("fixtures/reference-next-app");
 const uiPath = path.resolve("public/index.html");
 const eventClients = new Set();
+const ignoredDirectories = new Set(["node_modules", ".next", ".git"]);
 
 function json(res, status, body) {
   res.writeHead(status, {
@@ -21,18 +20,38 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-async function projectFiles(root) {
-  const result = [];
+async function workspaceContents(root) {
+  const files = [];
+  const folders = [];
   async function visit(directory) {
     for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-      if (["node_modules", ".next", ".git"].includes(entry.name)) continue;
+      if (ignoredDirectories.has(entry.name)) continue;
       const absolute = path.join(directory, entry.name);
-      if (entry.isDirectory()) await visit(absolute);
-      else if (/\.(tsx?|jsx?)$/.test(entry.name)) result.push(absolute);
+      const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+      if (entry.isDirectory()) {
+        folders.push({ path: relative, name: entry.name, kind: "folder" });
+        await visit(absolute);
+      } else {
+        files.push({ path: relative, name: entry.name, kind: "file", editable: isTextFile(entry.name) });
+      }
     }
   }
   await visit(root);
-  return result.sort();
+  return {
+    root,
+    files: files.sort((a, b) => a.path.localeCompare(b.path)),
+    folders: folders.sort((a, b) => a.path.localeCompare(b.path))
+  };
+}
+
+function isTextFile(file) {
+  return /\.(c|m)?(ts|tsx|js|jsx|json|css|scss|less|md|mdx|html|yml|yaml|txt|xml|svg|gitignore|env|toml|ini|lock)$/i.test(file) || !path.extname(file);
+}
+
+async function openWorkspace(root) {
+  const stats = await fs.stat(root);
+  if (!stats.isDirectory()) throw new Error("Workspace path is not a directory");
+  return workspaceContents(root);
 }
 
 async function analyze(root) {
@@ -155,7 +174,8 @@ async function saveFile(root, relative, content, expectedContent) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
-    const root = path.resolve(url.searchParams.get("root") || defaultRoot);
+    const requestedRoot = url.searchParams.get("root");
+    const root = requestedRoot ? path.resolve(requestedRoot) : null;
     if (req.method === "OPTIONS") return json(res, 204, {});
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -169,7 +189,14 @@ const server = http.createServer(async (req, res) => {
       req.on("close", () => eventClients.delete(res));
       return;
     }
-    if (req.method === "GET" && url.pathname === "/analyze") return json(res, 200, await analyze(root));
+    if (req.method === "GET" && url.pathname === "/workspace") {
+      if (!root) throw new Error("Workspace path is required");
+      return json(res, 200, await openWorkspace(root));
+    }
+    if (req.method === "GET" && url.pathname === "/analyze") {
+      if (!root) throw new Error("No workspace is open");
+      return json(res, 200, await analyze(root));
+    }
     if (req.method === "GET" && url.pathname === "/file") {
       const relative = url.searchParams.get("path");
       if (!relative || relative.includes("..") || path.isAbsolute(relative)) throw new Error("Invalid project-relative path");
@@ -197,13 +224,8 @@ const server = http.createServer(async (req, res) => {
   } catch (error) { return json(res, 400, { error: error.message }); }
 });
 
-export { analyze, planRename, applyRename, saveFile };
+export { analyze, openWorkspace, planRename, applyRename, saveFile, workspaceContents };
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  const stopWatching = watchWorkspace(defaultRoot, (changes) => {
-    const message = `event: workspace-change\ndata: ${JSON.stringify({ changes })}\n\n`;
-    for (const client of eventClients) client.write(message);
-  });
-  server.on("close", stopWatching);
   server.listen(port, "127.0.0.1", () => console.log(`Cortado service listening on http://127.0.0.1:${port}`));
 }
