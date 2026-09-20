@@ -2,7 +2,12 @@
 
 Cortado is an experimental software-development tool built around interactive visual representations of code. The long-term goal is to make code understandable and eventually editable through multiple synchronized visual views.
 
-## Current milestone
+> **Historical prototype notice:** the browser/Node prototype described below is
+> retained as evidence, not as the current product direction. See the
+> [foundation documents](docs/foundation/README.md) for current direction and
+> [historical records](docs/historical/README.md) for its former contracts.
+
+## Historical prototype milestone
 
 The first vertical slice targets a TypeScript Next.js application:
 

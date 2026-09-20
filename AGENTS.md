@@ -14,7 +14,7 @@ Cortado is an experimental software-development tool for interactive visual repr
 
 Do not couple the project model to React Flow, Monaco, Git, Electron, or WSL-specific details. Keep workspace resources project-relative and design change sets as explicit, reviewable objects.
 
-## Important behavioral contract
+## Historical prototype contract
 
 `BR-001` requires that a symbol rename:
 
@@ -26,7 +26,10 @@ Do not couple the project model to React Flow, Monaco, Git, Electron, or WSL-spe
 6. reports unsupported or ambiguous cases;
 7. preserves project parseability.
 
-The canonical requirement is [`docs/requirements/BR-001-safe-symbol-rename.md`](docs/requirements/BR-001-safe-symbol-rename.md), and its regression tests reference `BR-001`.
+This is historical prototype behavior, recorded at
+[`docs/historical/prototype/requirements/BR-001-safe-symbol-rename.md`](docs/historical/prototype/requirements/BR-001-safe-symbol-rename.md).
+It is not a current product commitment unless later accepted documentation
+adopts it; its regression tests still reference `BR-001`.
 
 ## Local commands
 
