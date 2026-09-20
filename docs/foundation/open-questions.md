@@ -13,18 +13,27 @@ These questions are deliberately unresolved. They are not implicit decisions.
    name-derived information be represented or marked?
    For the future behavior/intent evaluator, what controlled representation of
    names, comments, and documentation is compatible with the code-blind AI
-   policy?
+   policy? The structure and storage boundary for role- and purpose-scoped MCP
+   exposure remain open; any future choice should consider established
+   conventions in ML-powered vulnerability detection.
+   It is also open whether a designated extension area or label is useful for
+   language- and framework-specific evidence that remains outside the core.
 3. What is the first durable storage model for analysis snapshots, findings,
    evidence, annotations, and provenance?
 4. What metadata, versioning, confidence, limitations, and transitive
-   inference-derived markers are required on evidence and findings?
+   inference-derived markers are required on evidence and findings? The
+   concepts of observed, derived, inferred, and asserted evidence are decided,
+   but their concrete representation and use in confidence treatment are not.
    Producer provenance may be represented either by an identifier on each
    evidence item or by an owner for each evidence layer; this has not been
    decided.
-   In particular, calibration of the evidence-reliability confidence value is
-   not yet defined.
+   In particular, confidence itself is deferred: its existence on findings,
+   calibration, meaning, representation, and treatment across evidence chains
+   are not yet defined.
    Stability thresholds and the exact standard evaluation pipeline/framework
    for detecting/reporting unexpected output drift are also open.
+   The effect of asserted evidence, including human claims and agent
+   assertions, on overall confidence is also deferred.
 5. Which surfaces count as important schemas requiring human approval, beyond
    obvious persistent schemas?
 6. Does the first release include a human CLI, chat UI, or both, and what

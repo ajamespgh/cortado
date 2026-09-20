@@ -15,6 +15,35 @@
   logic/evidence flows from multiple languages (for example, TypeScript,
   Python, and C#), even though TypeScript is the first product-facing scan
   target.
+- **Canonical knowledge layer:** Cortado's central abstraction is a
+  language-neutral knowledge and evidence layer with the building blocks needed
+  to support purpose-specific consumers. Persistent storage, MCP/API contracts,
+  visualization models, security-detector inputs, and ML feature or training
+  representations are distinct projections or representations, not direct
+  concerns of that core.
+- **Shared language:** the canonical knowledge and evidence layer is intended
+  to become a shared language for a suite of tools, not merely an intermediate
+  representation for the first security scanner. A new language-neutral
+  consumer should be able to answer its question from that shared knowledge
+  without TypeScript-specific syntax or raw source. Genuinely language- or
+  framework-specific facts remain outside the core model.
+- **Analysis-representation semantics:** ASTs, control-flow graphs, call
+  graphs, data-flow representations, basic blocks, and related program-analysis
+  representations retain their distinct semantics. A common node-and-edge
+  substrate must not turn them into one universal graph model. Stable opaque
+  identities and evidence relationships may correlate entities across those
+  representations without erasing their meanings.
+- **Evidence categories:** Cortado conceptually distinguishes observed evidence
+  (established directly by authoritative tooling or source analysis), derived
+  evidence (deterministically calculated from evidence), inferred evidence
+  (dependent on assumptions or interpretive, probabilistic, or
+  non-deterministic processing), and asserted evidence (supplied by a human,
+  configuration, framework knowledge source, or other external authority).
+  Human-supplied claims and agent assertions are both asserted evidence: they
+  must be labeled rather than silently treated as ground truth or as observed
+  behavioral evidence.
+  This distinction is intended to inform future confidence treatment; it does
+  not yet prescribe a schema, numerical model, or propagation algorithm.
 - **Next.js demonstration:** Next.js is the first demonstration environment,
   not a core abstraction.
 - **Version-aware integrations:** a Next.js integration determines the
@@ -57,8 +86,11 @@
   `true`.
 - **Agent-visible identity:** first-slice logic-flow facts identify functions,
   modules, routes, and resources with stable opaque identifiers scoped to an
-  analysis snapshot. This supports evidence correlation without exposing actual
-  names; human citations still locate the underlying source.
+  analysis snapshot. These identities correlate entities across semantically
+  distinct analysis representations, join evidence independently produced by
+  analyzers, and support restricted purpose-specific projections without
+  exposing excluded attributes such as actual names. Human citations still
+  locate the underlying source.
 - **Scan initiation:** humans select repositories and initiate scans. A
   conversational chat agent may receive a limited re-scan capability, but
   intermediate evidence-gathering agents neither receive nor are aware of
@@ -139,6 +171,6 @@
 - Because liveness is gatherer-specific, security findings should surface the
   claimed relevance, its sources, and limitations instead of relying on a
   hidden global heuristic.
-- Consumers need a stable way to filter and sort findings by their supplied
-  confidence value. Confidence denotes evidence reliability; its calibration is
-  still open.
+- Confidence may ultimately be informed by evidence categories, but its
+  representation, calculation, propagation through evidence chains, and any
+  consumer filtering or sorting contract remain open pending experimentation.

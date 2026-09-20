@@ -33,12 +33,12 @@
   ML-based similarity to known CWE-related patterns.
 - Each finding must expose the evidence chain appropriate to its signal; a
   uniform confidence claim is not sufficient.
-- Findings include a confidence value even when evidence is incomplete or
-  ambiguous. Cortado does not silently withhold them solely for that reason;
-  the MCP or other consumer controls filtering and sorting.
-- **Confidence meaning:** confidence expresses the reliability of a finding's
-  supporting evidence. It does not by itself express vulnerability likelihood,
-  exploitability, or impact.
+- **Confidence is deferred:** Cortado does not yet require every finding to
+  expose a confidence value. Experiments must establish whether and how
+  confidence can be represented honestly, including its relationship to
+  evidence reliability, inference, vulnerability likelihood, exploitability,
+  and impact. Findings must not silently imply that these distinct concepts
+  share one measure.
 - Base scans expose raw data and supporting evidence rather than attempting to
   estimate impact or severity without sufficient context. Higher layers may use
   that material to identify patterns and synthesize new evidence; early users

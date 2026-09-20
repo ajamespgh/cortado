@@ -70,6 +70,13 @@ primary agent or source-mutation model without a later explicit decision.
 - For an unresolved early implementation question, agents may conduct a small,
   time-bounded technical spike. The spike records findings and a recommendation,
   then stops for a human decision before expanding into production work.
+- Every exploratory spike has a short written charter that identifies: the
+  uncertainty it is intended to reduce; existing decisions that constrain the
+  experiment; observations to record; what the spike is explicitly not
+  authorized to decide; and whether its outcome should lead to a decision,
+  requirement, another experiment, or no durable change. Spike code is
+  disposable unless explicitly promoted and must not silently establish
+  production architecture.
 - At the end of a coding session, the agent provides a concise sprint-style
   handoff: completed stories, deferred or blocked work, decisions made or
   needed, changed contracts, and verification results.
