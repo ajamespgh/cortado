@@ -1,7 +1,9 @@
 # Current architectural decisions
 
-This directory is reserved for accepted architectural decisions for the current
-product direction. It contains no current decision records yet.
+This directory contains accepted architectural decisions for the current
+product direction.
+
+- [Minimum durable evidence vocabulary](./2026-09-minimum-durable-evidence-vocabulary.md)
 
 The accepted bootstrap decisions are in
 [`docs/foundation/`](../foundation/README.md). Browser/Node prototype ADRs are
