@@ -28,14 +28,17 @@ function endpointHandlerReferences (sourceFile, selectedPaths, snapshot) {
     const handlers = []
     for (const participant of participants) {
       function findHandler (child) {
-        if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression) && ts.isIdentifier(child.expression.expression)) {
-          const moduleSpecifier = namespaceModules.get(child.expression.expression.text)
+        if (ts.isPropertyAccessExpression(child) && ts.isIdentifier(child.expression)) {
+          const moduleSpecifier = namespaceModules.get(child.expression.text)
           if (moduleSpecifier) handlers.push({
-            kind: 'namespace-member-handler-factory-call',
+            kind: ts.isCallExpression(child.parent) && child.parent.expression === child
+              ? 'namespace-member-handler-factory-call'
+              : 'namespace-member-handler-reference',
             moduleSpecifier,
-            name: child.expression.name.text,
-            citation: citation(sourceFile, child, snapshot)
+            name: child.name.text,
+            citation: citation(sourceFile, ts.isCallExpression(child.parent) && child.parent.expression === child ? child.parent : child, snapshot)
           })
+          return
         }
         ts.forEachChild(child, findHandler)
       }

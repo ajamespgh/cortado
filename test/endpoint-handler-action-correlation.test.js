@@ -38,3 +38,29 @@ test('correlation returns separate endpoint, guard, handler, and action observat
   assert.equal(paths[1].guardEvidence.status, 'unresolved-guard-evidence')
   assert.match(paths[1].guardEvidence.limitation, /not an authorization failure/)
 })
+
+test('correlation resolves a directly registered namespace handler reference', () => {
+  const paths = correlateEndpointHandlerActions({
+    serverSourceFile: source('server.ts', `
+      import * as security from './lib/insecurity'
+      import * as twoFactorAuth from './routes/2fa'
+      app.get('/2fa/status', security.isAuthorized(), twoFactorAuth.status)
+    `),
+    helperSourceFile: source('lib/insecurity.ts', `
+      export const isAuthorized = () => (req, res, next) => next()
+    `),
+    routeSourceFiles: [{ resource: 'routes/2fa.ts', sourceFile: source('routes/2fa.ts', `
+      export async function status (req, res) { res.json({ setup: true }) }
+    `) }],
+    modelSourceFiles: [],
+    snapshot: 'snapshot-1',
+    selectedOperations: [{ method: 'GET', path: '/2fa/status' }],
+    assertedGuardCatalog: [{ authority: 'fixture', moduleSpecifier: './lib/insecurity', members: ['isAuthorized'] }],
+    assertedActionCatalog: [{ receiver: 'res', member: 'json', action: 'response-emission', authority: 'fixture', reference: 'test' }]
+  })
+
+  assert.equal(paths[0].handler.status, 'resolved')
+  assert.equal(paths[0].handler.observations[0].reference.fact.kind, 'namespace-member-handler-reference')
+  assert.deepEqual(paths[0].actions.map(item => item.fact.action), ['response-emission'])
+  assert.equal(paths[0].guardEvidence.status, 'catalog-matched-middleware-evidence')
+})

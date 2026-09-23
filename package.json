@@ -13,7 +13,8 @@
     "spike:juice-shop-direct-calls-core": "node scripts/juice-shop-direct-calls-core-spike.mjs",
     "spike:juice-shop-authorization-middleware": "node scripts/juice-shop-authorization-middleware-spike.mjs",
     "spike:juice-shop-resource-actions": "node scripts/juice-shop-resource-action-spike.mjs",
-    "spike:juice-shop-endpoint-handler-actions": "node scripts/juice-shop-endpoint-handler-action-correlation-spike.mjs"
+    "spike:juice-shop-endpoint-handler-actions": "node scripts/juice-shop-endpoint-handler-action-correlation-spike.mjs",
+    "spike:juice-shop-access-control-candidates": "node scripts/juice-shop-access-control-candidates-spike.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
