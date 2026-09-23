@@ -1,0 +1,18 @@
+{
+  "id": "juice-shop-derived-v1",
+  "fixtureSnapshot": "security-evidence-juice-shop-derived-v1",
+  "source": {
+    "repository": "https://github.com/juice-shop/juice-shop",
+    "revision": "1618a611b173b4bf114028e6e02549950606e29d",
+    "license": "MIT",
+    "attribution": "OWASP Juice Shop and its contributors"
+  },
+  "kind": "minimal-derived-fixtures",
+  "mutationPolicy": "Tests parse these files read-only and assert their hashes do not change.",
+  "cases": [
+    "guard-evidence",
+    "unrecognized-guard-evidence",
+    "wrapper-indirection-ambiguity",
+    "computed-registration-unsupported"
+  ]
+}
