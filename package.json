@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.js",
     "test:juice-shop-corpus": "node scripts/juice-shop-corpus-smoke.mjs",
     "spike:juice-shop-endpoints": "node scripts/juice-shop-endpoints-spike.mjs",
-    "spike:juice-shop-direct-calls-core": "node scripts/juice-shop-direct-calls-core-spike.mjs"
+    "spike:juice-shop-direct-calls-core": "node scripts/juice-shop-direct-calls-core-spike.mjs",
+    "spike:juice-shop-authorization-middleware": "node scripts/juice-shop-authorization-middleware-spike.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
