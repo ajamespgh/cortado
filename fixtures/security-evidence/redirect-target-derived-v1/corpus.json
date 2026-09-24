@@ -1,0 +1,12 @@
+{
+  "id": "redirect-target-derived-v1",
+  "fixtureSnapshot": "redirect-target-derived-v1",
+  "source": {
+    "kind": "Cortado-authored minimal regression fixture",
+    "attribution": "Cortado contributors",
+    "externalSourceMaterial": false
+  },
+  "kind": "minimal-attributable-fixture",
+  "mutationPolicy": "Tests parse these files read-only and assert their hashes do not change.",
+  "cases": ["direct-request-to-redirect-target", "url-parsing-context", "alias-flow-unresolved"]
+}
