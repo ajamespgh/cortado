@@ -1,0 +1,14 @@
+{
+  "id": "file-operation-derived-v1",
+  "fixtureSnapshot": "file-operation-derived-v1",
+  "source": {
+    "repository": "https://github.com/juice-shop/juice-shop",
+    "revision": "1618a611b173b4bf114028e6e02549950606e29d",
+    "license": "MIT",
+    "attribution": "OWASP Juice Shop and its contributors",
+    "anchor": "routes/fileUpload.ts fs.createWriteStream(...) observation recorded by Cortado issue #52"
+  },
+  "kind": "minimal-derived-fixture",
+  "mutationPolicy": "Tests parse these files read-only and assert their hashes do not change.",
+  "cases": ["direct-request-to-file-sink", "path-normalization-context", "alias-flow-unresolved"]
+}
